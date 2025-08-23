@@ -10,7 +10,7 @@ from pathlib import Path
 from collections import defaultdict
 from copy import deepcopy
 
-VERSION = "1.0"
+VERSION = "1.1"
 
 # ANSI color codes
 GREEN = '\033[32m'
@@ -20,8 +20,10 @@ RED = '\033[31m'
 RESET = '\033[0m'
 BOLD = '\033[1m'
 
-def load_config(file_path='config/config.yml'):
+def load_config(file_path=None):
     """Load configuration from YAML file"""
+    if file_path is None:
+        file_path = Path(__file__).parent / 'config' / 'config.yml'
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
             return yaml.safe_load(file)
@@ -661,7 +663,7 @@ def main():
     if not check_yt_dlp_installed():
         sys.exit(1)
     
-    config = load_config('config/config.yml')
+    config = load_config()
     
     try:
         # Process and validate Sonarr URL
