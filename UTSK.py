@@ -761,7 +761,7 @@ def main():
                 print(f"\n{ORANGE}No upcoming shows to download trailers for{RESET}")
 				
         # ---- Create Kometa subfolder ----
-        kometa_folder = Path("Kometa")
+        kometa_folder = Path(__file__).parent / "Kometa"
         kometa_folder.mkdir(exist_ok=True)
         
         # ---- Create YAML Files ----
