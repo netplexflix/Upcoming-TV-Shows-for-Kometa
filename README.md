@@ -17,7 +17,7 @@
 1. **Clone the repository:**
    ```bash
    git clone https://github.com/netplexflix/Upcoming-TV-Shows-for-Kometa.git
-   cd UTSK
+   cd Upcoming-TV-Shows-for-Kometa
    ```
 > [!TIP]
 >If you don't know what that means, then simply download the script by pressing the green 'Code' button above and then 'Download Zip'.  
