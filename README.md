@@ -14,7 +14,7 @@
 ## 🛠️ Installation
 
 
-1. **Clone the repository:**
+### 1️⃣ Clone the repository:
    ```bash
    git clone https://github.com/netplexflix/Upcoming-TV-Shows-for-Kometa.git
    cd Upcoming-TV-Shows-for-Kometa
@@ -24,7 +24,7 @@
 >Extract the files to your desired folder.
 
 
-2. **Install Python dependencies:**
+### 2️⃣ Install Python dependencies:
 - Ensure you have [Python](https://www.python.org/downloads/) installed (`>=3.11`).
 - Open a Terminal in the script's directory
 > [!TIP]
@@ -34,6 +34,10 @@
 ```sh
 pip install -r requirements.txt
 ```
+
+### 3️⃣ Install ffmpeg
+[ffmpeg ](https://www.ffmpeg.org/) is required by yt-dlp to do postprocessing.
+Check [THIS WIKI](https://www.reddit.com/r/youtubedl/wiki/ffmpeg/#wiki_where_do_i_get_ffmpeg.3F) for more information on how to install ffmpeg.
 
 ---
 
@@ -55,6 +59,9 @@ Rename `config.example.yml` to `config.yml` and update your settings:
 - **debug:** set to `true` to troubleshoot yt-dlp problems
 - **skip_channels:** Blacklist Youtube channels that create fake trailers
 - **download_trailers:** You could set to `false` to skip downloading (dry run)
+
+#### <ins>path mapping</ins>
+Add path mapping if needed, for example if you're using unRAID.
 
 #### <ins>.yml settings:</ins>
 The other settings allow you to customize the output of the collection and overlay .yml files.
