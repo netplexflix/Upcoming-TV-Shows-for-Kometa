@@ -10,7 +10,7 @@ from pathlib import Path
 from collections import defaultdict
 from copy import deepcopy
 
-VERSION = "1.1"
+VERSION = "1.2"
 
 # ANSI color codes
 GREEN = '\033[32m'
@@ -181,6 +181,23 @@ def find_upcoming_shows(sonarr_url, api_key, future_days_upcoming_shows, utc_off
     
     return upcoming_shows, skipped_shows
 
+def map_path(original_path, path_mappings):
+    """Map Sonarr path to actual filesystem path"""
+    if not path_mappings:
+        return original_path
+    
+    # Convert to string if it's a Path object
+    path_str = str(original_path)
+    
+    # Try each mapping (longest first to handle nested paths)
+    for sonarr_path, actual_path in sorted(path_mappings.items(), key=lambda x: len(x[0]), reverse=True):
+        if path_str.startswith(sonarr_path):
+            mapped_path = path_str.replace(sonarr_path, actual_path, 1)
+            print(f"{BLUE}[PATH MAPPING] {path_str} -> {mapped_path}{RESET}")
+            return mapped_path
+    
+    return original_path
+
 def _normalize(s: str) -> str:
     return re.sub(r'[^a-z0-9]+', ' ', (s or '').lower()).strip()
 
@@ -310,7 +327,7 @@ def search_trailer_on_youtube(show_title, year=None, imdb_id=None, debug=False, 
 
     return best
 
-def download_trailer(show, trailer_info, debug=False):
+def download_trailer(show, trailer_info, config, debug=False):
     """
     Download trailer preferring 1080p, allowing any container/codec,
     then recode to MP4 via ffmpeg for compatibility.
@@ -321,11 +338,23 @@ def download_trailer(show, trailer_info, debug=False):
         print(f"{RED}No path found for show: {show.get('title')}{RESET}")
         return False
 
-    season_00_path = Path(show_path) / "Season 00"
+    # Apply path mapping
+    path_mappings = config.get('path_mapping', {})
+    mapped_path = map_path(show_path, path_mappings)
+    
+    season_00_path = Path(mapped_path) / "Season 00"
     season_00_path.mkdir(parents=True, exist_ok=True)
 
     clean_title = "".join(c for c in show['title'] if c.isalnum() or c in (' ', '-', '_')).rstrip()
     final_mp4_path = season_00_path / f"{clean_title}.S00E00.Trailer.mp4"
+
+    if debug:
+        print(f"{BLUE}[DEBUG] Sonarr path: {show_path}{RESET}")
+        print(f"{BLUE}[DEBUG] Mapped path: {mapped_path}{RESET}")
+        print(f"{BLUE}[DEBUG] Season 00 path: {season_00_path}{RESET}")
+        print(f"{BLUE}[DEBUG] Final MP4 path: {final_mp4_path}{RESET}")
+        print(f"{BLUE}[DEBUG] Path exists: {final_mp4_path.exists()}{RESET}")
+        print(f"{BLUE}[DEBUG] Parent exists: {final_mp4_path.parent.exists()}{RESET}")
 
     # Check if trailer already exists FIRST
     if final_mp4_path.exists():
@@ -719,10 +748,22 @@ def main():
                 # Check if trailer already exists first
                 show_path = show.get('path')
                 if show_path:
-                    season_00_path = Path(show_path) / "Season 00"
+                    path_mappings = config.get('path_mapping', {})
+                    mapped_path = map_path(show_path, path_mappings)
+                    season_00_path = Path(mapped_path) / "Season 00"
                     clean_title = "".join(c for c in show['title'] if c.isalnum() or c in (' ', '-', '_')).rstrip()
                     final_mp4_path = season_00_path / f"{clean_title}.S00E00.Trailer.mp4"
-                    
+
+                    if debug:
+                        print(f"{BLUE}[DEBUG MAIN] Show path: {show_path}{RESET}")
+                        print(f"{BLUE}[DEBUG MAIN] Mapped path: {mapped_path}{RESET}")
+                        print(f"{BLUE}[DEBUG MAIN] Season 00 path: {season_00_path}{RESET}")
+                        print(f"{BLUE}[DEBUG MAIN] Final MP4 path: {final_mp4_path}{RESET}")
+                        print(f"{BLUE}[DEBUG MAIN] File exists check: {final_mp4_path.exists()}{RESET}")
+                        print(f"{BLUE}[DEBUG MAIN] Parent dir exists: {final_mp4_path.parent.exists()}{RESET}")
+                        if final_mp4_path.parent.exists():
+                            print(f"{BLUE}[DEBUG MAIN] Contents of Season 00: {list(final_mp4_path.parent.iterdir())}{RESET}")
+			
                     if final_mp4_path.exists():
                         print(f"{GREEN}Trailer already exists for {show['title']} - skipping{RESET}")
                         skipped_existing += 1
@@ -742,7 +783,7 @@ def main():
                     print(f"Found trailer: {trailer_info['video_title']} ({trailer_info['duration']}) by {trailer_info['uploader']}")
                     
                     # Download trailer
-                    if download_trailer(show, trailer_info, debug):
+                    if download_trailer(show, trailer_info, config, debug):
                         successful_downloads += 1
                     else:
                         failed_downloads += 1

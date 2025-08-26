@@ -10,6 +10,12 @@ debug: false
 skip_channels: Starlight Cinema, fake trailers, Black And White Media
 download_trailers: true  # Set to false to skip downloading
 
+# Path mapping (useful for Docker/unRAID environments)
+  # Map Sonarr's internal paths to actual filesystem paths
+  # Format: sonarr_path: actual_path
+path_mapping:
+  "/tv": "/mnt/user/media/tv"
+
 collection_upcoming_shows:
   collection_name: "Coming Soon"
   smart_label: release.asc
