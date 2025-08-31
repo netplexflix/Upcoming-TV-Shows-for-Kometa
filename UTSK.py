@@ -20,6 +20,34 @@ RED = '\033[31m'
 RESET = '\033[0m'
 BOLD = '\033[1m'
 
+def check_for_updates():
+    print(f"Checking for updates to UTSK {VERSION}...")
+    
+    try:
+        response = requests.get(
+            "https://api.github.com/repos/netplexflix/Upcoming-TV-Shows-for-Kometa/releases/latest",
+            timeout=10
+        )
+        response.raise_for_status()
+        
+        latest_release = response.json()
+        latest_version = latest_release.get("tag_name", "").lstrip("v")
+        
+        def parse_version(version_str):
+            return tuple(map(int, version_str.split('.')))
+        
+        current_version_tuple = parse_version(VERSION)
+        latest_version_tuple = parse_version(latest_version)
+        
+        if latest_version and latest_version_tuple > current_version_tuple:
+            print(f"{ORANGE}A newer version of UTSK is available: {latest_version}{RESET}")
+            print(f"{ORANGE}Download: {latest_release.get('html_url', '')}{RESET}")
+            print(f"{ORANGE}Release notes: {latest_release.get('body', 'No release notes available')}{RESET}\n")
+        else:
+            print(f"{GREEN}You are running the latest version of UTSK.{RESET}\n")
+    except Exception as e:
+        print(f"{ORANGE}Could not check for updates: {str(e)}{RESET}\n")
+
 def load_config(file_path=None):
     """Load configuration from YAML file"""
     if file_path is None:
@@ -748,7 +776,7 @@ def check_yt_dlp_installed():
 def main():
     start_time = datetime.now()
     print(f"{BLUE}{'*' * 44}\n{'*' * 5} Upcoming TV Shows for Kometa {VERSION} {'*' * 5}\n{'*' * 44}{RESET}")
-    
+    check_for_updates()    
     # Check if yt-dlp is available
     if not check_yt_dlp_installed():
         sys.exit(1)
