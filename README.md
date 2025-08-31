@@ -125,6 +125,7 @@ You have now replaced the default home categories with your own, more flexible o
 You can do loads of other things with it this way. For example exclude certain shows from showing up by using genre (e.g. talk shows) or your own custom label you can manually apply to certain individual shows you don't want to show up in this home banner.
 
 <img width="809" height="161" alt="Image" src="https://github.com/user-attachments/assets/0cf0924e-1bcd-4871-87cf-7a3e5420aa0c" />
+
 ---
 
 ### ⚠️ **Do you Need Help or have Feedback?**
