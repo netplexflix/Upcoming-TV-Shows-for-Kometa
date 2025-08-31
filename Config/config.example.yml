@@ -9,6 +9,7 @@ future_days_upcoming_shows: 60
 debug: false
 skip_channels: Starlight Cinema, fake trailers, Black And White Media
 download_trailers: true  # Set to false to skip downloading
+cleanup: true
 
 # Path mapping (useful for Docker/unRAID environments)
   # Map Sonarr's internal paths to actual filesystem paths

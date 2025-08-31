@@ -10,7 +10,7 @@ from pathlib import Path
 from collections import defaultdict
 from copy import deepcopy
 
-VERSION = "1.2"
+VERSION = "1.3"
 
 # ANSI color codes
 GREEN = '\033[32m'
@@ -413,6 +413,67 @@ def download_trailer(show, trailer_info, config, debug=False):
         print(f"{RED}Download error for {show['title']}: {e}{RESET}")
         return False
 
+def cleanup_downloaded_trailers(sonarr_url, api_key, config, debug=False):
+    """Remove trailers for shows that now have S01E01 episodes"""
+    if debug:
+        print(f"{BLUE}[DEBUG] Starting trailer cleanup process{RESET}")
+    
+    removed_count = 0
+    checked_count = 0
+    path_mappings = config.get('path_mapping', {})
+    
+    # Get all series from Sonarr to check their status
+    all_series = get_sonarr_series(sonarr_url, api_key)
+    
+    for series in all_series:
+        show_path = series.get('path')
+        if not show_path:
+            continue
+            
+        # Apply path mapping
+        mapped_path = map_path(show_path, path_mappings)
+        season_00_path = Path(mapped_path) / "Season 00"
+        
+        if not season_00_path.exists():
+            continue
+            
+        # Look for trailer files downloaded by this script
+        trailer_files = list(season_00_path.glob("*.S00E00.Trailer.mp4"))
+        
+        for trailer_file in trailer_files:
+            checked_count += 1
+            if debug:
+                print(f"{BLUE}[DEBUG] Checking trailer: {trailer_file.name} for {series['title']}{RESET}")
+            
+            # Check if this show now has S01E01
+            episodes = get_sonarr_episodes(sonarr_url, api_key, series['id'])
+            s01e01_exists = any(
+                ep.get('seasonNumber') == 1 and 
+                ep.get('episodeNumber') == 1 and 
+                ep.get('hasFile', False)  # Episode has been downloaded
+                for ep in episodes
+            )
+            
+            if s01e01_exists:
+                try:
+                    file_size_mb = trailer_file.stat().st_size / (1024 * 1024)
+                    trailer_file.unlink()
+                    removed_count += 1
+                    print(f"{GREEN}Removed trailer for {series['title']} - S01E01 now available ({file_size_mb:.1f} MB freed){RESET}")
+                    if debug:
+                        print(f"{BLUE}[DEBUG] Deleted: {trailer_file}{RESET}")
+                except Exception as e:
+                    print(f"{RED}Error removing trailer for {series['title']}: {e}{RESET}")
+            elif debug:
+                print(f"{BLUE}[DEBUG] Keeping trailer for {series['title']} - S01E01 not yet available{RESET}")
+    
+    if removed_count > 0:
+        print(f"{GREEN}Cleanup complete: Removed {removed_count} trailer(s) from {checked_count} checked{RESET}")
+    elif checked_count > 0:
+        print(f"{GREEN}Cleanup complete: No trailers needed removal ({checked_count} checked){RESET}")
+    elif debug:
+        print(f"{BLUE}[DEBUG] No trailers found to check{RESET}")
+
 def format_date(yyyy_mm_dd, date_format, capitalize=False):
     """Format date according to specified format"""
     dt_obj = datetime.strptime(yyyy_mm_dd, "%Y-%m-%d")
@@ -704,6 +765,7 @@ def main():
         utc_offset = float(config.get('utc_offset', 0))
         skip_unmonitored = str(config.get("skip_unmonitored", "false")).lower() == "true"
         download_trailers = str(config.get("download_trailers", "true")).lower() == "true"
+        cleanup_trailers = str(config.get("cleanup", "false")).lower() == "true"  # NEW LINE
         debug = str(config.get("debug", "false")).lower() == "true"
         skip_channels = config.get("skip_channels", [])
         
@@ -715,8 +777,18 @@ def main():
         print(f"UTC offset: {utc_offset} hours")
         print(f"skip_unmonitored: {skip_unmonitored}")
         print(f"download_trailers: {download_trailers}")
+        print(f"cleanup: {cleanup_trailers}")  # NEW LINE
         print(f"debug: {debug}")
         print(f"skip_channels: {skip_channels}\n")
+
+        # ---- Cleanup Downloaded Trailers ----
+        if cleanup_trailers:
+            print(f"{BLUE}Checking for trailers to cleanup...{RESET}")
+            cleanup_downloaded_trailers(sonarr_url, sonarr_api_key, config, debug)
+            print()
+        else:
+            if debug:
+                print(f"{BLUE}[DEBUG] Trailer cleanup is disabled{RESET}\n")
 
         # ---- Find Upcoming Shows ----
         upcoming_shows, skipped_shows = find_upcoming_shows(
