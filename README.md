@@ -126,6 +126,26 @@ You can do loads of other things with it this way. For example exclude certain s
 
 <img width="809" height="161" alt="Image" src="https://github.com/user-attachments/assets/0cf0924e-1bcd-4871-87cf-7a3e5420aa0c" />
 
+</br></br>
+
+## 💡TIP2: Combine UTSK with the "New Season Soon" collection of [TSSK](https://github.com/netplexflix/TV-show-status-for-Kometa)
+![Image](https://github.com/user-attachments/assets/2843ae7f-3bf9-4b6c-b1da-bb0a513d0de0)
+
+You can use the following collection code to have Kometa apply a label to the shows without actually making the collection:
+
+```yml
+collection_upcoming_shows:
+  collection_name: "Coming Soon UTSK"
+  item_label: Coming Soon
+  non_item_remove_label: Coming Soon
+  build_collection: false
+```
+
+You can do the same for the "New Season Soon" collection of [TSSK](https://github.com/netplexflix/TV-show-status-for-Kometa), then manually create a smart collection that combines both upcoming new seasons as well as new premieres:
+
+<img width="795" height="257" alt="Image" src="https://github.com/user-attachments/assets/398574a6-0046-4f28-bbc0-671c5c5c0646" />
+
+
 ---
 
 ### ⚠️ **Do you Need Help or have Feedback?**
