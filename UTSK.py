@@ -10,7 +10,7 @@ from pathlib import Path
 from collections import defaultdict
 from copy import deepcopy
 
-VERSION = "1.4"
+VERSION = "1.5"
 
 # ANSI color codes
 GREEN = '\033[32m'
@@ -208,6 +208,86 @@ def find_upcoming_shows(sonarr_url, api_key, future_days_upcoming_shows, utc_off
                     print(f"{GREEN}[DEBUG] Added to upcoming shows: {series['title']}{RESET}")
     
     return upcoming_shows, skipped_shows
+
+def find_new_shows(sonarr_url, api_key, recent_days_new_show, utc_offset=0, skip_unmonitored=False, debug=False):
+    """Find shows where S01E01 has been downloaded and aired within specified past days"""
+    new_shows = []
+    
+    # Calculate date range (from x days ago to now)
+    now_local = datetime.now(timezone.utc) + timedelta(hours=utc_offset)
+    cutoff_date = now_local - timedelta(days=recent_days_new_show)
+    
+    if debug:
+        print(f"{BLUE}[DEBUG] Looking for shows with S01E01 aired between {cutoff_date} and {now_local}{RESET}")
+    
+    all_series = get_sonarr_series(sonarr_url, api_key)
+    
+    if debug:
+        print(f"{BLUE}[DEBUG] Found {len(all_series)} total series in Sonarr{RESET}")
+    
+    for series in all_series:
+        if debug:
+            print(f"{BLUE}[DEBUG] Checking series: {series['title']} (monitored: {series.get('monitored', True)}){RESET}")
+        
+        # Check if we should skip unmonitored shows
+        if skip_unmonitored and not series.get('monitored', True):
+            if debug:
+                print(f"{ORANGE}[DEBUG] Skipping unmonitored show: {series['title']}{RESET}")
+            continue
+        
+        # Get episodes for this series
+        episodes = get_sonarr_episodes(sonarr_url, api_key, series['id'])
+        
+        # Find S01E01
+        s01e01 = None
+        for ep in episodes:
+            if ep.get('seasonNumber') == 1 and ep.get('episodeNumber') == 1:
+                s01e01 = ep
+                break
+        
+        if not s01e01:
+            if debug:
+                print(f"{ORANGE}[DEBUG] No S01E01 found for {series['title']}{RESET}")
+            continue
+        
+        # Check if S01E01 has been downloaded
+        if not s01e01.get('hasFile', False):
+            if debug:
+                print(f"{ORANGE}[DEBUG] S01E01 not downloaded for {series['title']}{RESET}")
+            continue
+        
+        # Check air date
+        air_date_str = s01e01.get('airDateUtc')
+        if not air_date_str:
+            if debug:
+                print(f"{ORANGE}[DEBUG] No air date for {series['title']} S01E01{RESET}")
+            continue
+        
+        air_date = convert_utc_to_local(air_date_str, utc_offset)
+        
+        if debug:
+            print(f"{BLUE}[DEBUG] {series['title']} S01E01 aired: {air_date}, within range: {cutoff_date <= air_date <= now_local}{RESET}")
+        
+        # Check if aired within the specified past days
+        if cutoff_date <= air_date <= now_local:
+            tvdb_id = series.get('tvdbId')
+            air_date_str_yyyy_mm_dd = air_date.date().isoformat()
+            
+            show_dict = {
+                'title': series['title'],
+                'tvdbId': tvdb_id,
+                'path': series.get('path', ''),
+                'imdbId': series.get('imdbId', ''),
+                'year': series.get('year', None),
+                'airDate': air_date_str_yyyy_mm_dd
+            }
+            
+            new_shows.append(show_dict)
+            
+            if debug:
+                print(f"{GREEN}[DEBUG] Added to new shows: {series['title']}{RESET}")
+    
+    return new_shows
 
 def map_path(original_path, path_mappings):
     """Map Sonarr path to actual filesystem path"""
@@ -633,6 +713,63 @@ def create_overlay_yaml(output_file, shows, config_sections):
     with open(output_file, "w", encoding="utf-8") as f:
         yaml.dump(final_output, f, sort_keys=False)
 
+def create_new_shows_overlay_yaml(output_file, shows, config_sections):
+    """Create overlay YAML file for new shows with S01E01 downloaded"""
+    import yaml
+
+    if not shows:
+        with open(output_file, "w", encoding="utf-8") as f:
+            f.write("#No new shows found")
+        return
+    
+    # Collect all tvdb IDs
+    all_tvdb_ids = set()
+    for s in shows:
+        if s.get("tvdbId"):
+            all_tvdb_ids.add(s['tvdbId'])
+    
+    overlays_dict = {}
+    
+    # -- Backdrop Block --
+    backdrop_config = deepcopy(config_sections.get("backdrop", {}))
+    enable_backdrop = backdrop_config.pop("enable", True)
+
+    if enable_backdrop and all_tvdb_ids:
+        backdrop_config["name"] = "backdrop"
+        all_tvdb_ids_str = ", ".join(str(i) for i in sorted(all_tvdb_ids) if i)
+        
+        overlays_dict["backdrop"] = {
+            "overlay": backdrop_config,
+            "tvdb_show": all_tvdb_ids_str
+        }
+    
+    # -- Text Block (single block for all shows) --
+    text_config = deepcopy(config_sections.get("text", {}))
+    enable_text = text_config.pop("enable", True)
+    
+    if enable_text and all_tvdb_ids:
+        use_text = text_config.pop("use_text", "New Show")
+        
+        # Remove date_format and capitalize_dates as they're not needed
+        text_config.pop("date_format", None)
+        text_config.pop("capitalize_dates", None)
+        
+        # Create single overlay for all new shows
+        sub_overlay_config = deepcopy(text_config)
+        sub_overlay_config["name"] = f"text({use_text})"
+        
+        tvdb_ids_str = ", ".join(str(i) for i in sorted(all_tvdb_ids) if i)
+        
+        overlays_dict["UTSK_new_shows"] = {
+            "overlay": sub_overlay_config,
+            "tvdb_show": tvdb_ids_str
+        }
+    
+    final_output = {"overlays": overlays_dict}
+    
+    with open(output_file, "w", encoding="utf-8") as f:
+        yaml.dump(final_output, f, sort_keys=False)
+
 def create_collection_yaml(output_file, shows, config):
     """Create collection YAML file"""
     import yaml
@@ -799,6 +936,7 @@ def main():
         
         # Get configuration values
         future_days_upcoming_shows = config.get('future_days_upcoming_shows', 30)
+        recent_days_new_show = config.get('recent_days_new_show', 7) 
         utc_offset = float(config.get('utc_offset', 0))
         skip_unmonitored = str(config.get("skip_unmonitored", "false")).lower() == "true"
         download_trailers = str(config.get("download_trailers", "true")).lower() == "true"
@@ -811,6 +949,7 @@ def main():
             skip_channels = [ch.strip() for ch in skip_channels.split(',') if ch.strip()]
         
         print(f"future_days_upcoming_shows: {future_days_upcoming_shows}")
+        print(f"recent_days_new_show: {recent_days_new_show}")
         print(f"UTC offset: {utc_offset} hours")
         print(f"skip_unmonitored: {skip_unmonitored}")
         print(f"download_trailers: {download_trailers}")
@@ -843,7 +982,20 @@ def main():
             print(f"\n{ORANGE}Skipped shows (unmonitored):{RESET}")
             for show in skipped_shows:
                 print(f"- {show['title']}" + (f" ({show['year']})" if show['year'] else ""))
+
+        # ---- Find New Shows ----
+        print(f"\n{BLUE}Finding new shows with S01E01 downloaded...{RESET}")
+        new_shows = find_new_shows(
+            sonarr_url, sonarr_api_key, recent_days_new_show, utc_offset, skip_unmonitored, debug
+        )
         
+        if new_shows:
+            print(f"{GREEN}Found {len(new_shows)} new shows with S01E01 aired within the past {recent_days_new_show} days:{RESET}")
+            for show in new_shows:
+                print(f"- {show['title']}" + (f" ({show['year']})" if show['year'] else "") + f" - S01E01 aired: {show['airDate']}")
+        else:
+            print(f"{ORANGE}No new shows found with S01E01 aired within the past {recent_days_new_show} days.{RESET}")
+			
         # ---- Download Trailers ----
         if download_trailers and upcoming_shows:
             print(f"\n{BLUE}Processing trailers for upcoming shows...{RESET}")
@@ -920,11 +1072,16 @@ def main():
         
         # ---- Create YAML Files ----
         overlay_file = kometa_folder / "UTSK_TV_UPCOMING_SHOWS_OVERLAYS.yml"
+        new_shows_overlay_file = kometa_folder / "UTSK_TV_NEW_SHOWS_OVERLAYS.yml"
         collection_file = kometa_folder / "UTSK_TV_UPCOMING_SHOWS_COLLECTION.yml"
         
         create_overlay_yaml(str(overlay_file), upcoming_shows, 
                            {"backdrop": config.get("backdrop_upcoming_shows", {}),
                             "text": config.get("text_upcoming_shows", {})})
+
+        create_new_shows_overlay_yaml(str(new_shows_overlay_file), new_shows,
+                                      {"backdrop": config.get("backdrop_new_show", {}),
+                                       "text": config.get("text_new_show", {})})
         
         create_collection_yaml(str(collection_file), upcoming_shows, config)
         

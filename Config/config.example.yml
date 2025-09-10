@@ -1,9 +1,13 @@
-# Sonarr Configuration
+################################################################################
+##########                   SONARR CONFIGURATION:                    ##########
+################################################################################
 sonarr_url: 'http://localhost:8989'
 sonarr_api_key: 'YOUR_SONARR_API_KEY'
 skip_unmonitored: true
 
-#General
+################################################################################
+##########                         GENERAL:                           ##########
+################################################################################
 utc_offset: +1
 future_days_upcoming_shows: 60
 debug: false
@@ -17,6 +21,10 @@ cleanup: true
 path_mapping:
   "/tv": "/mnt/user/media/tv"
 
+
+################################################################################
+##########                     UPCOMING SHOWS:                        ##########
+################################################################################
 collection_upcoming_shows:
   collection_name: "Coming Soon"
   smart_label: release.asc
@@ -26,7 +34,7 @@ collection_upcoming_shows:
 # Upcoming shows backdrop overlay
 backdrop_upcoming_shows:
   enable: true
-  back_color: "#228B22"
+  back_color: "#EB3233"
   back_height: 90
   back_width: 950
   horizontal_align: center
@@ -45,3 +53,31 @@ text_upcoming_shows:
   vertical_offset: 35
   font_size: 70
   font_color: "#FFFFFF"
+
+################################################################################
+##########                        NEW SHOWS:                          ##########
+################################################################################
+recent_days_new_show: 7
+
+backdrop_new_show:
+  enable: true
+  back_color: "#EB3233"
+  back_height: 90
+  back_width: 950
+  horizontal_align: center
+  horizontal_offset: 0
+  vertical_align: bottom
+  vertical_offset: 20
+  group: TSSK_backdrop
+  weight: 50
+
+text_new_show:
+  use_text: "RECENTLY ADDED"
+  horizontal_align: center
+  horizontal_offset: 0
+  vertical_align: bottom
+  vertical_offset: 35
+  font_size: 70
+  font_color: "#FFFFFF"
+  group: TSSK_text
+  weight: 50
