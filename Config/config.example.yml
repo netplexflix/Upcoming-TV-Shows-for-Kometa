@@ -7,7 +7,7 @@ skip_unmonitored: true
 utc_offset: +1
 future_days_upcoming_shows: 60
 debug: false
-skip_channels: Starlight Cinema, fake trailers, Black And White Media
+skip_channels: Starlight Cinema, fake trailers, Black And White Media, CircleX Creations, New Movie Updates
 download_trailers: true  # Set to false to skip downloading
 cleanup: true
 
