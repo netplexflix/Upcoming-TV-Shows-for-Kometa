@@ -10,7 +10,7 @@ from pathlib import Path
 from collections import defaultdict
 from copy import deepcopy
 
-VERSION = "1.3"
+VERSION = "1.4"
 
 # ANSI color codes
 GREEN = '\033[32m'
@@ -259,12 +259,20 @@ def search_trailer_on_youtube(show_title, year=None, imdb_id=None, debug=False, 
         'behind the scenes','fan made','concept','music video','news','interview'
     ]
 
-    # Common official studios/streamers
-    official_channels = [
-        'netflix','hbo','max','amazon','prime video','disney','marvel','lucasfilm',
-        'apple tv','paramount','showtime','starz','fx','amc','peacock','universal',
-        'sony pictures','warner bros','20th century','lionsgate','bbc','itv','channel 4','hulu'
-    ]
+    # Unified list of preferred known/official YouTube channels
+    preferred_channels = {
+        # Exact channel names
+        "Netflix", "Prime Video", "HBO Max", "Max", "Apple TV", "Apple TV+",
+        "Marvel Entertainment", "Star Wars", "Lucasfilm", "Disney Plus",
+        "Disney", "Pixar", "Paramount Pictures", "Sony Pictures Entertainment",
+        "Warner Bros. Pictures", "Universal Pictures", "20th Century Studios",
+        "Lionsgate Movies", "BBC", "Peacock", "AMC", "Showtime", "Starz",
+
+        # Common substrings
+        "netflix","hbo","max","amazon","prime video","disney","marvel","lucasfilm",
+        "apple tv","paramount","showtime","starz","fx","amc","peacock","universal",
+        "sony pictures","warner bros","20th century","lionsgate","bbc","itv","channel 4","hulu"
+    }
 
     if debug:
         print(f"{BLUE}[DEBUG] Searching for trailers with these terms: {search_terms}{RESET}")
@@ -325,7 +333,13 @@ def search_trailer_on_youtube(show_title, year=None, imdb_id=None, debug=False, 
                 if 'official' in tl: score += 3
                 if 'trailer'  in tl: score += 2
                 if 'teaser'   in tl: score += 1
-                if any(ch in up.lower() for ch in official_channels): score += 3
+
+                # Channel scoring
+                if up.strip() in preferred_channels:
+                    score += 20  # big boost for exact match
+                elif any(ch in up.lower() for ch in preferred_channels):
+                    score += 5   # moderate boost for substring match
+
                 if year and str(year) in tl: score += 2
 
                 if score > best_score:
@@ -356,11 +370,6 @@ def search_trailer_on_youtube(show_title, year=None, imdb_id=None, debug=False, 
     return best
 
 def download_trailer(show, trailer_info, config, debug=False):
-    """
-    Download trailer preferring 1080p, allowing any container/codec,
-    then recode to MP4 via ffmpeg for compatibility.
-    Checks if file exists first to avoid unnecessary searches.
-    """
     show_path = show.get('path')
     if not show_path:
         print(f"{RED}No path found for show: {show.get('title')}{RESET}")
@@ -374,22 +383,13 @@ def download_trailer(show, trailer_info, config, debug=False):
     season_00_path.mkdir(parents=True, exist_ok=True)
 
     clean_title = "".join(c for c in show['title'] if c.isalnum() or c in (' ', '-', '_')).rstrip()
-    final_mp4_path = season_00_path / f"{clean_title}.S00E00.Trailer.mp4"
 
     if debug:
         print(f"{BLUE}[DEBUG] Sonarr path: {show_path}{RESET}")
         print(f"{BLUE}[DEBUG] Mapped path: {mapped_path}{RESET}")
         print(f"{BLUE}[DEBUG] Season 00 path: {season_00_path}{RESET}")
-        print(f"{BLUE}[DEBUG] Final MP4 path: {final_mp4_path}{RESET}")
-        print(f"{BLUE}[DEBUG] Path exists: {final_mp4_path.exists()}{RESET}")
-        print(f"{BLUE}[DEBUG] Parent exists: {final_mp4_path.parent.exists()}{RESET}")
 
-    # Check if trailer already exists FIRST
-    if final_mp4_path.exists():
-        print(f"{GREEN}Trailer already exists for {show['title']}{RESET}")
-        return True
-
-    # Only proceed with download if file doesn't exist
+    # Prepare download path
     filename = f"{clean_title}.S00E00.Trailer.%(ext)s"
     output_path = season_00_path / filename
 
@@ -397,17 +397,14 @@ def download_trailer(show, trailer_info, config, debug=False):
         # Helper to run a single attempt with a given format string
         def _run(format_string):
             ydl_opts = {
-                # Allow any codec/container at selected resolution; we'll recode to MP4 after
                 'format': format_string,
                 'outtmpl': str(output_path),
                 'noplaylist': True,
-                # Force final file to MP4 by recoding (robust even if input is VP9/AV1+Opus)
+                # Always remux to mkv/mp4 if needed
                 'postprocessors': [{
                     'key': 'FFmpegVideoConvertor',
-                    'preferedformat': 'mp4'
+                    'preferedformat': 'mkv'
                 }],
-                # Ensure faststart for streaming compatibility
-                'postprocessor_args': ['-movflags', '+faststart'],
                 'ignoreerrors': False,
                 'quiet': not debug,
                 'no_warnings': not debug,
@@ -418,20 +415,23 @@ def download_trailer(show, trailer_info, config, debug=False):
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([trailer_info['url']])
 
-        print(f"Downloading trailer for {show['title']} (prefer 1080p, will recode to MP4)...")
+        print(f"Downloading trailer for {show['title']} (prefer 1080p MKV/MP4)...")
 
         try:
-            # Try EXACT 1080p first (any container/codec)
-            _run('bv*[height=1080]+ba/b[height=1080]')
+            # Try EXACT 1080p first, prefer mkv > mp4
+            _run('(bv*[ext=mkv][height=1080]+ba/b[ext=mkv][height=1080]) / (bv*[ext=mp4][height=1080]+ba[ext=m4a]/b[ext=mp4][height=1080]) / (bv*[height=1080]+ba/b[height=1080])')
         except Exception as e1:
             if debug:
                 print(f"{ORANGE}[DEBUG] 1080p exact failed ({e1}); trying best <=1080p{RESET}")
-            # Then accept the best ≤1080p
-            _run('bv*[height<=1080]+ba/b[height<=1080]')
+            # Then accept the best ≤1080p, still prefer mkv > mp4
+            _run('(bv*[ext=mkv][height<=1080]+ba/b[ext=mkv][height<=1080]) / (bv*[ext=mp4][height<=1080]+ba[ext=m4a]/b[ext=mp4][height<=1080]) / (bv*[height<=1080]+ba/b[height<=1080])')
 
-        if final_mp4_path.exists():
-            size_mb = final_mp4_path.stat().st_size / (1024 * 1024)
-            print(f"{GREEN}Successfully downloaded trailer for {show['title']} ({size_mb:.1f} MB){RESET}")
+        # Check for downloaded file with any supported extension
+        downloaded_files = list(season_00_path.glob(f"{clean_title}.S00E00.Trailer.*"))
+        if downloaded_files:
+            downloaded_file = downloaded_files[0]
+            size_mb = downloaded_file.stat().st_size / (1024 * 1024)
+            print(f"{GREEN}Successfully downloaded trailer for {show['title']}: {downloaded_file.name} ({size_mb:.1f} MB){RESET}")
             return True
 
         print(f"{RED}Trailer file not found after download for {show['title']}{RESET}")
@@ -441,8 +441,9 @@ def download_trailer(show, trailer_info, config, debug=False):
         print(f"{RED}Download error for {show['title']}: {e}{RESET}")
         return False
 
+
 def cleanup_downloaded_trailers(sonarr_url, api_key, config, debug=False):
-    """Remove trailers for shows that now have S01E01 episodes"""
+    """Remove trailers for shows that now have S01E01 episodes by scanning filesystem"""
     if debug:
         print(f"{BLUE}[DEBUG] Starting trailer cleanup process{RESET}")
     
@@ -453,6 +454,14 @@ def cleanup_downloaded_trailers(sonarr_url, api_key, config, debug=False):
     # Get all series from Sonarr to check their status
     all_series = get_sonarr_series(sonarr_url, api_key)
     
+    # Create a mapping of show titles to series info for matching
+    series_by_title = {}
+    for series in all_series:
+        # Use the same title cleaning logic as used for trailer filenames
+        clean_title = "".join(c for c in series['title'] if c.isalnum() or c in (' ', '-', '_')).rstrip()
+        series_by_title[clean_title] = series
+    
+    # Scan all series paths for trailer files
     for series in all_series:
         show_path = series.get('path')
         if not show_path:
@@ -465,8 +474,8 @@ def cleanup_downloaded_trailers(sonarr_url, api_key, config, debug=False):
         if not season_00_path.exists():
             continue
             
-        # Look for trailer files downloaded by this script
-        trailer_files = list(season_00_path.glob("*.S00E00.Trailer.mp4"))
+        # Look for trailer files (any extension, not just .mp4)
+        trailer_files = list(season_00_path.glob("*.S00E00.Trailer.*"))
         
         for trailer_file in trailer_files:
             checked_count += 1
@@ -845,27 +854,31 @@ def main():
             for show in upcoming_shows:
                 print(f"\nProcessing: {show['title']}")
                 
-                # Check if trailer already exists first
+                # Check if trailer already exists first (with ANY extension)
                 show_path = show.get('path')
                 if show_path:
                     path_mappings = config.get('path_mapping', {})
                     mapped_path = map_path(show_path, path_mappings)
                     season_00_path = Path(mapped_path) / "Season 00"
                     clean_title = "".join(c for c in show['title'] if c.isalnum() or c in (' ', '-', '_')).rstrip()
-                    final_mp4_path = season_00_path / f"{clean_title}.S00E00.Trailer.mp4"
-
+                    
+                    # Check for existing trailer with any extension
+                    trailer_pattern = f"{clean_title}.S00E00.Trailer.*"
+                    existing_trailers = list(season_00_path.glob(trailer_pattern)) if season_00_path.exists() else []
+    
                     if debug:
                         print(f"{BLUE}[DEBUG MAIN] Show path: {show_path}{RESET}")
                         print(f"{BLUE}[DEBUG MAIN] Mapped path: {mapped_path}{RESET}")
                         print(f"{BLUE}[DEBUG MAIN] Season 00 path: {season_00_path}{RESET}")
-                        print(f"{BLUE}[DEBUG MAIN] Final MP4 path: {final_mp4_path}{RESET}")
-                        print(f"{BLUE}[DEBUG MAIN] File exists check: {final_mp4_path.exists()}{RESET}")
-                        print(f"{BLUE}[DEBUG MAIN] Parent dir exists: {final_mp4_path.parent.exists()}{RESET}")
-                        if final_mp4_path.parent.exists():
-                            print(f"{BLUE}[DEBUG MAIN] Contents of Season 00: {list(final_mp4_path.parent.iterdir())}{RESET}")
-			
-                    if final_mp4_path.exists():
-                        print(f"{GREEN}Trailer already exists for {show['title']} - skipping{RESET}")
+                        print(f"{BLUE}[DEBUG MAIN] Trailer pattern: {trailer_pattern}{RESET}")
+                        print(f"{BLUE}[DEBUG MAIN] Existing trailers: {existing_trailers}{RESET}")
+                        print(f"{BLUE}[DEBUG MAIN] Parent dir exists: {season_00_path.exists()}{RESET}")
+                        if season_00_path.exists():
+                            print(f"{BLUE}[DEBUG MAIN] Contents of Season 00: {list(season_00_path.iterdir())}{RESET}")
+    		
+                    if existing_trailers:
+                        existing_file = existing_trailers[0]
+                        print(f"{GREEN}Trailer already exists for {show['title']}: {existing_file.name} - skipping{RESET}")
                         skipped_existing += 1
                         successful_downloads += 1  # Count as successful since we have the file
                         continue
