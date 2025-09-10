@@ -93,8 +93,9 @@ TV Shows:
     - file: P:/scripts/UTSK/Kometa/UTSK_TV_UPCOMING_SHOWS_COLLECTION.yml
   overlay_files:
     - file: P:/scripts/UTSK/Kometa/UTSK_TV_UPCOMING_SHOWS_OVERLAYS.yml
-
 ```
+
+If you use an overlay for "recently added TV Shows", for instance with [TSSK](https://github.com/netplexflix/TV-show-status-for-Kometa), then shows handled by UTSK may not get this overlay applied because Plex will identify these shows as being 'added' whenever UTSK downloaded the Trailer. To fix this, you can add `UTSK_TV_NEW_SHOWS_OVERLAYS.yml` to your Kometa config as well. This overlay will be applied to all shows for which S01E01 aired within `recent_days_new_show`, regardless of how long ago the show itself was added. If you already use another overlay for new/recently added shows, make sure to use the same group and apply different weights so they don't both get applied by Kometa.
 
 ---
 
