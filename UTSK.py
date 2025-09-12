@@ -10,7 +10,7 @@ from pathlib import Path
 from collections import defaultdict
 from copy import deepcopy
 
-VERSION = "1.5"
+VERSION = "1.6"
 
 # ANSI color codes
 GREEN = '\033[32m'
@@ -664,7 +664,9 @@ def create_overlay_yaml(output_file, shows, config_sections):
     enable_backdrop = backdrop_config.pop("enable", True)
 
     if enable_backdrop and all_tvdb_ids:
-        backdrop_config["name"] = "backdrop"
+        # Allow override of hardcoded "name" value
+        if "name" not in backdrop_config:
+            backdrop_config["name"] = "backdrop"
         all_tvdb_ids_str = ", ".join(str(i) for i in sorted(all_tvdb_ids) if i)
         
         overlays_dict["backdrop"] = {
@@ -686,7 +688,9 @@ def create_overlay_yaml(output_file, shows, config_sections):
             for date_str in sorted(date_to_tvdb_ids):
                 formatted_date = format_date(date_str, date_format, capitalize_dates)
                 sub_overlay_config = deepcopy(text_config)
-                sub_overlay_config["name"] = f"text({use_text} {formatted_date})"
+                # Allow override of hardcoded "name" value
+                if "name" not in sub_overlay_config:
+                    sub_overlay_config["name"] = f"text({use_text} {formatted_date})"
                 
                 tvdb_ids_for_date = sorted(tvdb_id for tvdb_id in date_to_tvdb_ids[date_str] if tvdb_id)
                 tvdb_ids_str = ", ".join(str(i) for i in tvdb_ids_for_date)
@@ -699,7 +703,9 @@ def create_overlay_yaml(output_file, shows, config_sections):
         else:
             # Fallback for shows without air dates
             sub_overlay_config = deepcopy(text_config)
-            sub_overlay_config["name"] = f"text({use_text})"
+            # Allow override of hardcoded "name" value
+            if "name" not in sub_overlay_config:
+                sub_overlay_config["name"] = f"text({use_text})"
             
             tvdb_ids_str = ", ".join(str(i) for i in sorted(all_tvdb_ids) if i)
             
@@ -735,7 +741,9 @@ def create_new_shows_overlay_yaml(output_file, shows, config_sections):
     enable_backdrop = backdrop_config.pop("enable", True)
 
     if enable_backdrop and all_tvdb_ids:
-        backdrop_config["name"] = "backdrop"
+        # Allow override of hardcoded "name" value
+        if "name" not in backdrop_config:
+            backdrop_config["name"] = "backdrop"
         all_tvdb_ids_str = ", ".join(str(i) for i in sorted(all_tvdb_ids) if i)
         
         overlays_dict["backdrop"] = {
@@ -756,7 +764,9 @@ def create_new_shows_overlay_yaml(output_file, shows, config_sections):
         
         # Create single overlay for all new shows
         sub_overlay_config = deepcopy(text_config)
-        sub_overlay_config["name"] = f"text({use_text})"
+        # Allow override of hardcoded "name" value
+        if "name" not in sub_overlay_config:
+            sub_overlay_config["name"] = f"text({use_text})"
         
         tvdb_ids_str = ", ".join(str(i) for i in sorted(all_tvdb_ids) if i)
         
@@ -791,9 +801,12 @@ def create_collection_yaml(output_file, shows, config):
         collection_config = deepcopy(config[config_key])
         collection_name = collection_config.pop("collection_name", "Upcoming Shows")
     
-    # Get the future_days value for summary
+    # Get the future_days value for summary - allow override from config
     future_days = config.get('future_days_upcoming_shows', 30)
-    summary = f"Shows with their first episode premiering within {future_days} days"
+    if "summary" not in collection_config:
+        summary = f"Shows with their first episode premiering within {future_days} days"
+    else:
+        summary = collection_config.pop("summary")
     
     class QuotedString(str):
         pass
@@ -805,17 +818,20 @@ def create_collection_yaml(output_file, shows, config):
 
     # Handle the case when no shows are found
     if not shows:
+        # Allow override of hardcoded values
+        plex_search_config = {
+            "all": {
+                "label": collection_name
+            }
+        }
+        
         data = {
             "collections": {
                 collection_name: {
-                    "plex_search": {
-                        "all": {
-                            "label": collection_name
-                        }
-                    },
+                    "plex_search": plex_search_config,
                     "item_label.remove": collection_name,
-                    "smart_label": "random",
-                    "build_collection": False
+                    "smart_label": collection_config.get("smart_label", "random"),
+                    "build_collection": collection_config.get("build_collection", False)
                 }
             }
         }
@@ -826,16 +842,19 @@ def create_collection_yaml(output_file, shows, config):
     
     tvdb_ids = [s['tvdbId'] for s in shows if s.get('tvdbId')]
     if not tvdb_ids:
+        # Allow override of hardcoded values
+        plex_search_config = {
+            "all": {
+                "label": collection_name
+            }
+        }
+        
         data = {
             "collections": {
                 collection_name: {
-                    "plex_search": {
-                        "all": {
-                            "label": collection_name
-                        }
-                    },
+                    "plex_search": plex_search_config,
                     "non_item_remove_label": collection_name,
-                    "build_collection": False
+                    "build_collection": collection_config.get("build_collection", False)
                 }
             }
         }
@@ -858,8 +877,9 @@ def create_collection_yaml(output_file, shows, config):
         else:
             collection_data[key] = value
     
-    # Add sync_mode after the config parameters
-    collection_data["sync_mode"] = "sync"
+    # Add sync_mode after the config parameters - allow override
+    if "sync_mode" not in collection_data:
+        collection_data["sync_mode"] = "sync"
     
     # Add tvdb_show as the last item
     collection_data["tvdb_show"] = tvdb_ids_str
