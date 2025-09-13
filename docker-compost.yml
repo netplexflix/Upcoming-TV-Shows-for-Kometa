@@ -1,9 +1,9 @@
 services:
-  umfk:
+  utsk:
     build:
       context: https://github.com/ThatCasualMatt/Upcoming-TV-Shows-for-Kometa.git#main
       dockerfile: Dockerfile
-    container_name: umfk
+    container_name: utsk
     environment:
       - CRON=0 2 * * *     # daily at 2AM
       - DOCKER=true
