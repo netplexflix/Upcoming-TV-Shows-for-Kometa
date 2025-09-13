@@ -5,6 +5,7 @@ import json
 import yaml
 import sys
 import subprocess
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from collections import defaultdict
@@ -1087,8 +1088,8 @@ def main():
                 print(f"\n{ORANGE}No upcoming shows to download trailers for{RESET}")
 				
         # ---- Create Kometa subfolder ----
-        kometa_folder = Path(__file__).parent / "Kometa"
-        kometa_folder.mkdir(exist_ok=True)
+        kometa_folder = Path("/config/kometa/umfk") if IS_DOCKER else Path("kometa/")
+        os.makedirs(kometa_folder, exist_ok=True)
         
         # ---- Create YAML Files ----
         overlay_file = kometa_folder / "UTSK_TV_UPCOMING_SHOWS_OVERLAYS.yml"
