@@ -1,0 +1,16 @@
+services:
+  umfk:
+    build:
+      context: https://github.com/ThatCasualMatt/Upcoming-TV-Shows-for-Kometa.git#main
+      dockerfile: Dockerfile
+    container_name: umfk
+    environment:
+      - CRON=0 2 * * *     # daily at 2AM
+      - DOCKER=true
+      - RUN_NOW=true       # run immediately on container start
+      - REPO=https://github.com/ThatCasualMatt/Upcoming-TV-Shows-for-Kometa.git
+    volumes:
+      - /your/local/config/utsk:/app/config
+      - /your/local/kometa/config:/config/kometa
+      - /your/local/media/movies:/sonarr/path/to/movies
+    restart: unless-stopped
