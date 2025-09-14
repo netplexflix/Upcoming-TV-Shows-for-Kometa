@@ -11,6 +11,7 @@ from pathlib import Path
 from collections import defaultdict
 from copy import deepcopy
 
+IS_DOCKER = os.getenv("DOCKER", "false").lower() == "true"
 VERSION = "1.6"
 
 # ANSI color codes
