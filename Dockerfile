@@ -19,7 +19,7 @@ RUN apk add --no-cache \
         musl-dev \
         libffi-dev \
         python3-dev \
-        py3-pip
+        py3-pip \
         ffmpeg
 
 # Copy requirements if you build from local
