@@ -1088,7 +1088,7 @@ def main():
                 print(f"\n{ORANGE}No upcoming shows to download trailers for{RESET}")
 				
         # ---- Create Kometa subfolder ----
-        kometa_folder = Path("/config/kometa/umfk") if IS_DOCKER else Path("kometa/")
+        kometa_folder = Path("/config/kometa/utsk") if IS_DOCKER else Path("kometa/")
         os.makedirs(kometa_folder, exist_ok=True)
         
         # ---- Create YAML Files ----
