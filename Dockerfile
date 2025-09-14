@@ -20,6 +20,7 @@ RUN apk add --no-cache \
         libffi-dev \
         python3-dev \
         py3-pip
+        ffmpeg
 
 # Copy requirements if you build from local
 COPY requirements.txt /app/requirements.txt
