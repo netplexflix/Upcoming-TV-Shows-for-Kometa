@@ -1,3 +1,5 @@
+# THIS PROJECT IS NOW CONSOLIDATED IN [UMTK](https://github.com/netplexflix/Upcoming-Movies-TV-Shows-for-Kometa). 
+
 # 📺 Upcoming TV Shows for Kometa
 
 **UTSK** (Upcoming TV Shows for Kometa) creates a 'coming soon' collection in your Plex server. It accomplishes this by
